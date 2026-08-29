@@ -1,0 +1,860 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Heart, Calendar, MapPin, Sparkles, Camera, BookOpen, Mail, Music, 
+  Trophy, CheckSquare, Plus, Edit2, Trash2, X, Lock, Unlock, Image as ImageIcon, 
+  Smile, UserPlus, Share2, Compass, MessageCircle, Star, Eye, Send, Filter,
+  ExternalLink, Volume2, Award, Gift, PartyPopper, Check, Clock, ChevronRight,
+  Info, RefreshCw, Upload, Play, Layers, Globe, Copy, Download, Printer, QrCode
+} from 'lucide-react';
+
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp 
+} from 'firebase/firestore';
+
+// Initialize Firebase safely (Supports Platform Injected Config, Global Window Config, or Local Fallback)
+const getFirebaseConfig = () => {
+  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    try { return JSON.parse(__firebase_config); } catch (e) { console.error("Firebase config parse error", e); }
+  }
+  if (typeof window !== 'undefined' && window.FIREBASE_CONFIG) {
+    try { return typeof window.FIREBASE_CONFIG === 'string' ? JSON.parse(window.FIREBASE_CONFIG) : window.FIREBASE_CONFIG; } catch (e) { console.error("Window Firebase config error", e); }
+  }
+  return {};
+};
+
+const firebaseConfig = getFirebaseConfig();
+const app = firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null;
+const auth = app ? getAuth(app) : null;
+const db = app ? getFirestore(app) : null;
+const appId = (typeof __app_id !== 'undefined' && __app_id) 
+  ? __app_id 
+  : (typeof window !== 'undefined' && window.APP_ID)
+    ? window.APP_ID
+    : 'ruang-pulang-circle';
+
+const DEFAULT_SETTINGS = {
+  circleName: "Ruang Pulang",
+  tagline: "Untuk segala yang pernah singgah, semoga setiap langkahnya membawa kisah",
+  subtitle: "A little digital home for all the memories we don't want to forget.",
+  foundedYear: "2023",
+  heroImage: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=1200",
+  customQuote: "Beberapa orang hanya singgah, tapi kita memilih untuk pulang."
+};
+
+const DEFAULT_MEMBERS = [
+  { id: '1', name: 'Al Fasya Aulia Syahda', nickname: 'Fasya', role: 'Chief Planner & DJ', birthday: '14 Oktober', personality: 'ENFP', favoriteFood: 'Seblak & Matcha', favoriteSong: 'Nadin Amizah - Rayuan Perempuan Gila', quote: 'Nanti juga beres, tenang aja!', instagram: '@fasya.aulia', photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400', mostLikelyTo: 'Datang terlambat 45 menit tapi bawa camilan' },
+  { id: '2', name: 'Alrisa Sukma Lizara', nickname: 'Alrisa', role: 'Memory Keeper', birthday: '22 Mei', personality: 'INFJ', favoriteFood: 'Dimsum & Es Kopi', favoriteSong: 'Hindia - Evaluasi', quote: 'Jangan lupa foto dulu guys!', instagram: '@alrisasukma', photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=400', mostLikelyTo: 'Menangis saat nonton konser bersama' },
+  { id: '3', name: 'Khansa Rapuatul Alifah', nickname: 'Khansa', role: 'Chaotic Energy', birthday: '03 Januari', personality: 'ENTP', favoriteFood: 'Ramen Pedas', favoriteSong: 'Feast - Berita Kehilangan', quote: 'Gue paham, tapi mending kita jalan dulu.', instagram: '@khansarap', photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=400', mostLikelyTo: 'Mengajak jalan-jalan jam 12 malam' },
+  { id: '4', name: 'Amalia Salsa Fatiha', nickname: 'Amalia', role: 'The Listener', birthday: '18 Agustus', personality: 'ISFP', favoriteFood: 'Ayam Geprek', favoriteSong: 'Kunto Aji - Rehat', quote: 'Pelan-pelan asal bareng.', instagram: '@amaliasalsa', photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=400', mostLikelyTo: 'Tidur nyenyak di pertengahan film' }
+];
+
+const DEFAULT_STORIES = [
+  { id: '1', year: '2023', title: 'Awal Pertemuan di Kedai Kopi', description: 'Gara-gara hujan deras dan kedai kopi penuh, kita terpaksa duduk satu meja. Percakapan 10 menit berubah jadi hangout 4 jam.', photo: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&q=80&w=800', author: 'Alrisa' },
+  { id: '2', year: '2024', title: 'First Trip to Ocean Breeze', description: 'Perjalanan impian pertama kita ke pantai. Mobil mogok di tengah jalan, tapi justru jadi kenangan paling kocak.', photo: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=800', author: 'Fasya' },
+  { id: '3', year: '2024', title: 'Late Night Heart-to-Heart', description: 'Begadang di vila Dago, cerita tentang mimpi, patah hati, dan janji untuk selalu ada untuk satu sama lain.', photo: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=800', author: 'Khansa' }
+];
+
+const DEFAULT_MEMORIES = [
+  { id: '1', title: 'Movie Night & Warm Pizza', category: 'Hangouts', date: '20 Mei 2024', location: 'Rumah Fasya', uploader: 'Alrisa', photo: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=800', caption: 'Movie night yang berujung cerita panjang sampai subuh.' },
+  { id: '2', title: 'Sunset Hunting di Bukit', category: 'Trips', date: '12 Juli 2024', location: 'Bandung Barat', uploader: 'Tera', photo: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&q=80&w=800', caption: 'Mengejar matahari terbenam walau macet parah.' },
+  { id: '3', title: 'Kejut Ultah Khansa', category: 'Birthdays', date: '03 Jan 2025', location: 'Cafe Resto', uploader: 'Amalia', photo: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?auto=format&fit=crop&q=80&w=800', caption: 'Lilin sempat mati 3 kali gara-gara angin kencang!' },
+  { id: '4', title: 'Kulineran Malam Seblak Pedas', category: 'Food Dates', date: '15 Feb 2025', location: 'Dipatiukur', uploader: 'Fasya', photo: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=800', caption: 'Siapa yang minta level 5 tapi kepedasan sendiri?' }
+];
+
+const DEFAULT_ACTIVITIES = [
+  { id: '1', title: 'Barbeque & Camping Weekend', date: '15 September 2026', location: 'Ranca Upas', status: 'Upcoming', participants: '8 Orang', note: 'Jangan lupa bawa jaket tebal dan speaker portable!', createdBy: 'Fasya' },
+  { id: '2', title: 'Tukar Kado Akhir Tahun', date: '28 Desember 2025', location: 'Vila Lembang', status: 'Completed', participants: 'Semua Anggota', note: 'Nominal kado maks 100rb, seru banget kado zonknya!', createdBy: 'Alrisa' }
+];
+
+const DEFAULT_PLACES = [
+  { id: '1', name: 'Bandung', visits: '12+ Kali', photo: 'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?auto=format&fit=crop&q=80&w=800', description: 'Kota pertama tempat circle ini tumbuh dan menemukan hangatnya persahabatan.' },
+  { id: '2', name: 'Yogyakarta', visits: '2 Kali', photo: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&q=80&w=800', description: 'Jalan Malioboro, gudeg malam hari, dan naik delman di alun-alun.' }
+];
+
+const DEFAULT_JOURNALS = [
+  { id: '1', title: 'Tentang Bertumbuh Tanpa Harus Berjauhan', author: 'Alrisa', date: '10 Januari 2025', photo: 'https://images.unsplash.com/photo-1499209974431-9dac3ada00d7?auto=format&fit=crop&q=80&w=800', content: 'Kadang aku berpikir tentang masa depan kita masing-masing. Pekerjaan baru, kota yang berbeda, atau kesibukan yang menyita waktu. Tapi setiap kali kita berkumpul lagi di ruang ini, waktu seolah berhenti. Kita tetaplah anak-anak muda yang tertawa di kedai kopi dua tahun lalu.' }
+];
+
+const DEFAULT_LETTERS = [
+  { id: '1', sender: 'Tera', recipient: 'Fasya', category: 'Open when you miss us', content: 'Hey Fasya! Kalau kamu lagi ngerasa sendiri atau capek sama rutinitas, inget ya kalau kami selalu ada satu telfon jauhnya. Jangan dipendem sendiri!', date: '01 Feb 2025' },
+  { id: '2', sender: 'Anonim', recipient: 'Semua Circle', category: 'Open on your birthday', content: 'Makasih udah jadi tempat aman buat saling cerita tanpa takut di-judge. Love you all so much!', date: '14 Feb 2025' }
+];
+
+const DEFAULT_WALL_OF_CHAOS = [
+  { id: '1', title: 'Alasan Telat Paling Absurd', author: 'Tera', quote: '“Gue udah di jalan (padahal baru bangun dan masih pakai selimut)”', photo: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=600', tag: 'Inside Joke' },
+  { id: '2', title: 'Ayam Geprek Level 100', author: 'Khansa', quote: '“Siapa bilang ini pedas? *mata berkaca-kaca*”', photo: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&q=80&w=600', tag: 'Fail Moment' }
+];
+
+const DEFAULT_SOUNDTRACK = [
+  { id: '1', title: 'Rayuan Perempuan Gila', artist: 'Nadin Amizah', addedBy: 'Fasya', story: 'Lagu wajib pas kami road trip malam-malam hujan.', link: 'https://open.spotify.com' },
+  { id: '2', title: 'Evaluasi', artist: 'Hindia', addedBy: 'Alrisa', story: 'Diputar berulang kali waktu kita lagi pusing tugas akhir.', link: 'https://open.spotify.com' }
+];
+
+const DEFAULT_AWARDS = [
+  { id: '1', title: '🏆 Most Likely To Be Late', winner: 'Al Fasya', description: 'Rekor telat 47 menit dengan alasan kucing tetangga melahirkan.', nominatedBy: 'Khansa' },
+  { id: '2', title: '🏆 Mom of The Group', winner: 'Alrisa', description: 'Selalu bawa tisu basah, minyak kayu putih, dan obat maag.', nominatedBy: 'Amalia' }
+];
+
+const DEFAULT_VAULT = [
+  { id: '1', title: 'Surat Rahasia Tahun Baru 2027', openDate: '2027-01-01', content: 'Selamat! Kita berhasil melewati tahun-tahun sulit. Janji ya untuk tetap rutin ketemu minimal sebulan sekali!', author: 'Fasya', photo: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=800' }
+];
+
+const DEFAULT_BUCKET_LIST = [
+  { id: '1', title: 'Nonton Konser Musik Festival Bersama', completed: true, dateCompleted: '14 Nov 2024', addedBy: 'Khansa' },
+  { id: '2', title: 'Road trip Bali - Lombok 7 Hari', completed: false, addedBy: 'Fasya' },
+  { id: '3', title: 'Staycation Vila Kolam Renang Heated', completed: false, addedBy: 'Alrisa' }
+];
+
+const DEFAULT_DREAM_BOARD = [
+  { id: '1', author: 'Amalia', text: 'Pas umur 30 nanti, kita masih punya waktu liburan bareng seminggu full tiap tahun!', tag: 'Masa Depan' },
+  { id: '2', author: 'Fasya', text: 'Semoga kita semua sukses dengan karir masing-masing tapi tetep sama konyolnya pas ketemu.', tag: 'Doa Bersama' }
+];
+
+const DEFAULT_GUESTBOOK = [
+  { id: '1', name: 'Rian (Teman Kampus)', message: 'Suka banget sama visual scrapbook kalian! Salam hangat yaa ✨', emoji: '💖', date: '28 Feb 2026' },
+  { id: '2', name: 'Sarah', message: 'Kalian bertiga konyol banget di Wall of Chaos, langgeng terus persahabatannya!', emoji: '🌸', date: '01 Mar 2026' }
+];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('beranda');
+  const [userName, setUserName] = useState(localStorage.getItem('rp_user_name') || '');
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // Publishing & Share States
+  const [isPublicView, setIsPublicView] = useState(false); // Mode Tamu (Read-Only Preview)
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishTab, setPublishTab] = useState('link'); // 'link' | 'settings' | 'export' | 'guestbook'
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [guestbook, setGuestbook] = useState(DEFAULT_GUESTBOOK);
+  const [newGuestMessage, setNewGuestMessage] = useState('');
+  const [newGuestName, setNewGuestName] = useState('');
+  const [newGuestEmoji, setNewGuestEmoji] = useState('💖');
+
+  // Firestore collections states
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [members, setMembers] = useState(DEFAULT_MEMBERS);
+  const [stories, setStories] = useState(DEFAULT_STORIES);
+  const [memories, setMemories] = useState(DEFAULT_MEMORIES);
+  const [activities, setActivities] = useState(DEFAULT_ACTIVITIES);
+  const [places, setPlaces] = useState(DEFAULT_PLACES);
+  const [journals, setJournals] = useState(DEFAULT_JOURNALS);
+  const [letters, setLetters] = useState(DEFAULT_LETTERS);
+  const [wallOfChaos, setWallOfChaos] = useState(DEFAULT_WALL_OF_CHAOS);
+  const [soundtrack, setSoundtrack] = useState(DEFAULT_SOUNDTRACK);
+  const [awards, setAwards] = useState(DEFAULT_AWARDS);
+  const [vault, setVault] = useState(DEFAULT_VAULT);
+  const [bucketList, setBucketList] = useState(DEFAULT_BUCKET_LIST);
+  const [dreamBoard, setDreamBoard] = useState(DEFAULT_DREAM_BOARD);
+
+  // Status indicator
+  const [syncStatus, setSyncStatus] = useState('Synced');
+
+  // Generic Edit/Add Modal State
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState(null);
+
+  // Envelope Modal State
+  const [activeLetter, setActiveLetter] = useState(null);
+  const [isLetterOpen, setIsLetterOpen] = useState(false);
+
+  // Firebase Auth setup
+  useEffect(() => {
+    if (!auth) {
+      setSyncStatus('Offline Mode (In-Memory)');
+      return;
+    }
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.warn("Auth initialization fallback:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
+
+  // Sync collections with Firestore
+  useEffect(() => {
+    if (!db || !user) return;
+
+    const getColRef = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
+
+    // Sync settings
+    const unsubSettings = onSnapshot(getColRef('settings'), (snap) => {
+      if (!snap.empty) {
+        setSettings(snap.docs[0].data());
+      }
+    }, (err) => console.log("Settings error:", err));
+
+    // Helper for simple array collections
+    const syncCollection = (colName, setState, defaultData) => {
+      return onSnapshot(getColRef(colName), (snap) => {
+        if (!snap.empty) {
+          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setState(list);
+        }
+      }, (err) => console.log(`${colName} error:`, err));
+    };
+
+    const unsubs = [
+      unsubSettings,
+      syncCollection('members', setMembers, DEFAULT_MEMBERS),
+      syncCollection('stories', setStories, DEFAULT_STORIES),
+      syncCollection('memories', setMemories, DEFAULT_MEMORIES),
+      syncCollection('activities', setActivities, DEFAULT_ACTIVITIES),
+      syncCollection('places', setPlaces, DEFAULT_PLACES),
+      syncCollection('journals', setJournals, DEFAULT_JOURNALS),
+      syncCollection('letters', setLetters, DEFAULT_LETTERS),
+      syncCollection('wall_of_chaos', setWallOfChaos, DEFAULT_WALL_OF_CHAOS),
+      syncCollection('soundtrack', setSoundtrack, DEFAULT_SOUNDTRACK),
+      syncCollection('awards', setAwards, DEFAULT_AWARDS),
+      syncCollection('vault', setVault, DEFAULT_VAULT),
+      syncCollection('bucket_list', setBucketList, DEFAULT_BUCKET_LIST),
+      syncCollection('dream_board', setDreamBoard, DEFAULT_DREAM_BOARD),
+      syncCollection('guestbook', setGuestbook, DEFAULT_GUESTBOOK)
+    ];
+
+    return () => unsubs.forEach(unsub => unsub && unsub());
+  }, [user]);
+
+  // Helper to copy live link
+  const handleCopyLink = () => {
+    const url = window.location.href;
+    const dummy = document.createElement('input');
+    document.body.appendChild(dummy);
+    dummy.value = url;
+    dummy.select();
+    document.execCommand('copy');
+    document.body.removeChild(dummy);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2500);
+  };
+
+  // Export full JSON backup
+  const handleExportJSON = () => {
+    const exportData = {
+      appId,
+      settings,
+      members,
+      stories,
+      memories,
+      activities,
+      places,
+      journals,
+      letters,
+      wallOfChaos,
+      soundtrack,
+      awards,
+      vault,
+      bucketList,
+      dreamBoard,
+      exportedAt: new Date().toISOString()
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `${settings.circleName.toLowerCase().replace(/\s+/g, '_')}_scrapbook.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  // Trigger Print / PDF View
+  const handlePrintBook = () => {
+    window.print();
+  };
+
+  // Post guestbook message
+  const handleAddGuestbookMessage = (e) => {
+    e.preventDefault();
+    if (!newGuestName.trim() || !newGuestMessage.trim()) return;
+
+    const entry = {
+      name: newGuestName,
+      message: newGuestMessage,
+      emoji: newGuestEmoji,
+      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+    };
+
+    saveToCloud('guestbook', entry);
+    setNewGuestName('');
+    setNewGuestMessage('');
+  };
+
+  // Request user name before action if not set
+  const executeWithIdentity = (actionFn) => {
+    if (!userName.trim()) {
+      setPendingAction(() => actionFn);
+      setShowNameModal(true);
+    } else {
+      actionFn(userName);
+    }
+  };
+
+  const handleSaveUserName = (name) => {
+    if (!name.trim()) return;
+    setUserName(name);
+    localStorage.setItem('rp_user_name', name);
+    setShowNameModal(false);
+    if (pendingAction) {
+      pendingAction(name);
+      setPendingAction(null);
+    }
+  };
+
+  // Database Save Helper
+  const saveToCloud = async (collectionName, data, id = null) => {
+    setSyncStatus('Saving...');
+    try {
+      if (db && user) {
+        const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+        if (collectionName === 'settings') {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'main');
+          await setDoc(docRef, { ...data, updatedAt: serverTimestamp() });
+        } else if (id) {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
+          await updateDoc(docRef, { ...data, updatedAt: serverTimestamp() });
+        } else {
+          await addDoc(colRef, { ...data, createdAt: serverTimestamp() });
+        }
+      } else {
+        // Fallback local state update
+        if (collectionName === 'settings') {
+          setSettings(data);
+        } else {
+          const stateSetterMap = {
+            members: setMembers,
+            stories: setStories,
+            memories: setMemories,
+            activities: setActivities,
+            places: setPlaces,
+            journals: setJournals,
+            letters: setLetters,
+            wall_of_chaos: setWallOfChaos,
+            soundtrack: setSoundtrack,
+            awards: setAwards,
+            vault: setVault,
+            bucket_list: setBucketList,
+            dream_board: setDreamBoard
+          };
+          const setState = stateSetterMap[collectionName];
+          if (setState) {
+            setState(prev => {
+              if (id) return prev.map(item => item.id === id ? { ...item, ...data } : item);
+              return [{ id: Date.now().toString(), ...data }, ...prev];
+            });
+          }
+        }
+      }
+      setSyncStatus('Saved ✓');
+      setTimeout(() => setSyncStatus('Synced'), 2000);
+    } catch (err) {
+      console.error("Save error:", err);
+      setSyncStatus('Offline (Saved locally)');
+    }
+  };
+
+  // Delete Item Helper
+  const deleteItem = (collectionName, id) => {
+    executeWithIdentity(async () => {
+      setSyncStatus('Saving...');
+      try {
+        if (db && user) {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
+          await deleteDoc(docRef);
+        } else {
+          const stateSetterMap = {
+            members: setMembers,
+            stories: setStories,
+            memories: setMemories,
+            activities: setActivities,
+            places: setPlaces,
+            journals: setJournals,
+            letters: setLetters,
+            wall_of_chaos: setWallOfChaos,
+            soundtrack: setSoundtrack,
+            awards: setAwards,
+            vault: setVault,
+            bucket_list: setBucketList,
+            dream_board: setDreamBoard
+          };
+          const setState = stateSetterMap[collectionName];
+          if (setState) setState(prev => prev.filter(item => item.id !== id));
+        }
+        setSyncStatus('Saved ✓');
+        setTimeout(() => setSyncStatus('Synced'), 2000);
+      } catch (err) {
+        console.error("Delete error:", err);
+      }
+    });
+  };
+
+  // Toggle Bucket list item
+  const toggleBucketList = (item) => {
+    executeWithIdentity(async (authorName) => {
+      const updated = {
+        completed: !item.completed,
+        dateCompleted: !item.completed ? new Date().toLocaleDateString('id-ID') : '',
+        lastModifiedBy: authorName
+      };
+      await saveToCloud('bucket_list', updated, item.id);
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#FFF9F2] text-[#26354A] font-sans selection:bg-[#F9DDE8]">
+      
+      {/* Public View Mode Banner Indicator */}
+      {isPublicView && (
+        <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white text-xs font-semibold py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-sm">
+          <span>👁️ Anda sedang melihat dalam **Mode Tamu (Public View)**. Pengeditan disembunyikan.</span>
+          <button
+            onClick={() => setIsPublicView(false)}
+            className="underline bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-[11px] font-bold transition"
+          >
+            Kembali ke Mode Pengedit
+          </button>
+        </div>
+      )}
+
+      {/* Top Sticky Bar */}
+      <header className="sticky top-0 z-40 bg-[#FFF9F2]/90 backdrop-blur-md border-b border-[#E8E0F5] px-4 py-3 shadow-sm print:hidden">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          {/* Logo / Circle Title */}
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('beranda')}>
+            <div className="w-10 h-10 rounded-2xl bg-[#F9DDE8] flex items-center justify-center text-[#26354A] shadow-inner font-bold text-xl">
+              🏠
+            </div>
+            <div>
+              <h1 className="font-serif font-bold text-xl leading-none text-[#26354A]">
+                {settings.circleName}
+              </h1>
+              <span className="text-xs text-[#26354A]/60 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                <span>{syncStatus}</span>
+                <span className="text-gray-300">•</span>
+                <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-medium text-[10px]">Dipublikasikan 🌐</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-1 overflow-x-auto py-1 text-sm font-medium">
+            {[
+              { id: 'beranda', label: 'Beranda' },
+              { id: 'our-story', label: 'Tentang Kami' },
+              { id: 'the-people', label: 'Anggota' },
+              { id: 'memories', label: 'Galeri' },
+              { id: 'kegiatan', label: 'Kegiatan' },
+              { id: 'surat', label: 'Surat' },
+              { id: 'wall-of-chaos', label: 'Wall of Chaos' },
+              { id: 'soundtrack', label: 'Soundtrack' },
+              { id: 'more', label: 'Lainnya ▾' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-full transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-[#E8E0F5] text-[#26354A] font-semibold shadow-sm'
+                    : 'hover:bg-[#F9DDE8]/50 text-[#26354A]/80'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Header Action Buttons including Publish */}
+          <div className="flex items-center space-x-2">
+            {/* Publish & Share Button */}
+            <button
+              onClick={() => setShowPublishModal(true)}
+              className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full text-xs font-bold shadow-md flex items-center space-x-1.5 transition-all transform hover:scale-105"
+            >
+              <Globe className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '8s' }} />
+              <span>🚀 Bagikan & Publish</span>
+            </button>
+
+            {!isPublicView && (
+              <button
+                onClick={() => {
+                  executeWithIdentity(() => {
+                    setModalConfig({
+                      type: 'memories',
+                      mode: 'add',
+                      title: 'Tambah Kenangan Baru',
+                      collectionName: 'memories',
+                      fields: [
+                        { name: 'title', label: 'Judul Momen', type: 'text', placeholder: 'cth: Camp di Ranca Upas' },
+                        { name: 'category', label: 'Kategori', type: 'select', options: ['Hangouts', 'Trips', 'Food Dates', 'Birthdays', 'Random Days', 'Celebrations'] },
+                        { name: 'date', label: 'Tanggal', type: 'text', placeholder: 'cth: 12 Mei 2025' },
+                        { name: 'location', label: 'Lokasi', type: 'text', placeholder: 'cth: Bandung' },
+                        { name: 'photo', label: 'Foto / Gambar', type: 'image' },
+                        { name: 'caption', label: 'Cerita Singkat', type: 'textarea' },
+                      ]
+                    });
+                    setModalOpen(true);
+                  });
+                }}
+                className="hidden sm:flex px-3.5 py-2 bg-[#F9DDE8] hover:bg-[#f3c8da] border border-[#f0b9d1] rounded-full text-xs font-semibold shadow-sm items-center space-x-1.5 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-pink-600" />
+                <span>+ Kenangan</span>
+              </button>
+            )}
+
+            {!isPublicView && (
+              <button
+                onClick={() => setShowNameModal(true)}
+                className="text-xs px-2.5 py-1.5 rounded-full bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+                title="Ganti Nama Pengedit"
+              >
+                <span>✍️ {userName || 'Siapa Anda?'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Navigation Submenu for "Lainnya" if active */}
+      {/* ... existing code ... */}
+
+      {/* MAIN CONTENT AREA */}
+      <main className="max-w-7xl mx-auto px-4 py-6 md:py-10">
+        
+        {/* ==================== 1. HOMEPAGE / BERANDA ==================== */}
+        {activeTab === 'beranda' && (
+          <div className="space-y-12 animate-fadeIn">
+            
+            {/* HERO SECTION MATCHING REFERENCE DESIGN */}
+            {/* ... existing code ... */}
+
+            {/* ROOM DOORS GRID ("PILIH KAMARMU") */}
+            {/* ... existing code ... */}
+
+            {/* QUICK PREVIEWS GRID */}
+            {/* ... existing code ... */}
+
+            {}
+            {/* PUBLIC GUESTBOOK / UCAPAN PENGUNJUNG SECTION */}
+            <div className="bg-white rounded-3xl border-2 border-pink-100 p-6 md:p-8 shadow-sm space-y-6">
+              <div className="flex justify-between items-center flex-wrap gap-4 border-b border-pink-50 pb-4">
+                <div>
+                  <span className="text-[11px] bg-pink-100 text-pink-800 px-3 py-1 rounded-full font-bold">
+                    💌 BUKU TAMU DIGITAL
+                  </span>
+                  <h3 className="font-serif text-2xl font-bold text-gray-800 mt-1">
+                    Pesan & Doa Dari Pengunjung
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Bagi teman atau pengunjung yang singgah di web ini, silakan tinggalkan jejak hangat!
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setPublishTab('guestbook');
+                    setShowPublishModal(true);
+                  }}
+                  className="text-xs text-pink-600 font-semibold hover:underline flex items-center gap-1"
+                >
+                  Lihat Semua Pesan ({guestbook.length}) →
+                </button>
+              </div>
+
+              {/* Form Tambah Pesan Tamu */}
+              <form onSubmit={handleAddGuestbookMessage} className="bg-[#FFF9F2] p-4 rounded-2xl border border-amber-100 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Nama Anda..."
+                    value={newGuestName}
+                    onChange={(e) => setNewGuestName(e.target.value)}
+                    className="sm:col-span-4 px-3 py-2 rounded-xl border border-amber-200 text-xs focus:ring-2 focus:ring-pink-300 focus:outline-none"
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Tulis pesan atau ucapan manis..."
+                    value={newGuestMessage}
+                    onChange={(e) => setNewGuestMessage(e.target.value)}
+                    className="sm:col-span-6 px-3 py-2 rounded-xl border border-amber-200 text-xs focus:ring-2 focus:ring-pink-300 focus:outline-none"
+                    required
+                  />
+                  <select
+                    value={newGuestEmoji}
+                    onChange={(e) => setNewGuestEmoji(e.target.value)}
+                    className="sm:col-span-2 px-3 py-2 rounded-xl border border-amber-200 text-xs focus:ring-2 focus:ring-pink-300 focus:outline-none"
+                  >
+                    <option value="💖">💖 Love</option>
+                    <option value="🌸">🌸 Warm</option>
+                    <option value="🎉">🎉 Cheers</option>
+                    <option value="✨">✨ Magic</option>
+                  </select>
+                </div>
+
+                <div className="text-right">
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-pink-500 hover:bg-pink-600 text-white rounded-xl text-xs font-bold transition shadow-sm inline-flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3" /> Kirim Pesan
+                  </button>
+                </div>
+              </form>
+
+              {/* List Buku Tamu */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {guestbook.slice(0, 6).map((g) => (
+                  <div key={g.id} className="bg-[#FFF9F2]/60 p-4 rounded-2xl border border-pink-100 shadow-2xs space-y-2 relative">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-gray-800 flex items-center gap-1">
+                        <span>{g.emoji || '💖'}</span> {g.name}
+                      </span>
+                      <span className="text-[10px] text-gray-400">{g.date}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 italic font-serif">"{g.message}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* ... existing code tabs ... */}
+
+      </main>
+
+      {}
+      {/* ==================== PUBLISH & SHARE MODAL HUB ==================== */}
+      {showPublishModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full space-y-6 shadow-2xl border border-purple-100 animate-scaleUp my-8">
+            
+            {/* Header Modal */}
+            <div className="flex justify-between items-center border-b pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-400 to-purple-500 text-white flex items-center justify-center font-bold text-xl shadow">
+                  🚀
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-2xl text-gray-800">Pusat Publikasi & Bagikan</h3>
+                  <p className="text-xs text-gray-500">Publikasikan scrapbook ini agar bisa diakses sahabat & pengunjung!</p>
+                </div>
+              </div>
+              <button onClick={() => setShowPublishModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Tab Navigation inside Publish Hub */}
+            <div className="flex space-x-2 border-b pb-2 overflow-x-auto text-xs font-semibold">
+              {[
+                { id: 'link', label: '🔗 Tautan & QR Code' },
+                { id: 'settings', label: '⚙️ Mode & Akses' },
+                { id: 'export', label: '🖨️ Cetak & Ekspor' },
+                { id: 'guestbook', label: '💌 Kelola Buku Tamu' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setPublishTab(tab.id)}
+                  className={`px-4 py-2 rounded-xl transition ${
+                    publishTab === tab.id
+                      ? 'bg-[#F9DDE8] text-pink-900 font-bold shadow-xs'
+                      : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* TAB 1: SHARE LINK & QR CODE */}
+            {publishTab === 'link' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-800 font-bold text-base">
+                    ✓
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">Status: Scrapbook Ini Aktif & Dipublikasikan 🌐</p>
+                    <p className="text-emerald-700">Setiap perubahan data tersimpan otomatis dan bisa dilihat oleh siapa saja yang memiliki link ini.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-gray-700">Tautan Web Resmi Scrapbook:</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={window.location.href}
+                      className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono text-gray-700 focus:outline-none"
+                    />
+                    <button
+                      onClick={handleCopyLink}
+                      className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copySuccess ? 'Tersalin! ✓' : 'Salin Link'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* QR CODE GENERATOR */}
+                <div className="bg-[#FFF9F2] p-5 rounded-2xl border border-amber-100 flex flex-col md:flex-row items-center gap-6">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.href)}`}
+                    alt="QR Code Scrapbook"
+                    className="w-36 h-36 border-4 border-white rounded-2xl shadow-md bg-white p-2"
+                  />
+                  <div className="space-y-2 text-center md:text-left">
+                    <h4 className="font-serif font-bold text-base text-gray-800">Scan QR Code untuk Membuka</h4>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Pindai QR code ini menggunakan kamera HP untuk langsung membawa sahabat Anda ke dalam halaman *{settings.circleName}*.
+                    </p>
+                    <a
+                      href={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.href)}`}
+                      target="_blank"
+                      download="qr_scrapbook.png"
+                      rel="noreferrer"
+                      className="inline-block text-xs text-purple-700 font-bold hover:underline pt-1"
+                    >
+                      ⬇ Unduh Gambar QR Code HD
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: PRIVACY & VISITOR PREVIEW */}
+            {publishTab === 'settings' && (
+              <div className="space-y-5 animate-fadeIn">
+                <div className="p-4 rounded-2xl bg-purple-50 border border-purple-100 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-800">Preview Mode Tamu (Public View)</h4>
+                      <p className="text-xs text-gray-500">Sembunyikan tombol edit/hapus untuk melihat tampilan sebagai pengunjung biasa.</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsPublicView(!isPublicView);
+                        setShowPublishModal(false);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                        isPublicView ? 'bg-amber-500 text-white' : 'bg-purple-600 text-white'
+                      }`}
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>{isPublicView ? 'Matikan Mode Tamu' : 'Aktifkan Mode Tamu'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 text-xs text-gray-600">
+                  <h4 className="font-bold text-gray-800 text-sm">💡 Tips Publikasi Web:</h4>
+                  <ul className="list-disc list-inside space-y-1 bg-gray-50 p-4 rounded-2xl border">
+                    <li>Semua orang yang punya link ini bisa melihat postingan, foto, dan kenangan.</li>
+                    <li>Pastikan tidak mengunggah data sensitif seperti nomor HP, alamat rumah lengkap, atau kata sandi pribadi.</li>
+                    <li>Gunakan fitur "Wall of Chaos" dan "Buku Tamu" untuk saling berinteraksi secara menyenangkan.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: EXPORT & PRINT */}
+            {publishTab === 'export' && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Print Book Option */}
+                  <div className="bg-[#FFF9F2] p-5 rounded-2xl border border-amber-200 space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-200 flex items-center justify-center text-amber-900 font-bold text-lg">
+                      🖨️
+                    </div>
+                    <h4 className="font-serif font-bold text-lg text-gray-800">Cetak Buku Kenangan (PDF)</h4>
+                    <p className="text-xs text-gray-600">
+                      Cetak langsung atau simpan halaman ini sebagai file PDF fisik untuk kenang-kenangan.
+                    </p>
+                    <button
+                      onClick={handlePrintBook}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Cetak / Save PDF
+                    </button>
+                  </div>
+
+                  {/* Export JSON Option */}
+                  <div className="bg-[#E8E0F5]/50 p-5 rounded-2xl border border-purple-200 space-y-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-200 flex items-center justify-center text-purple-900 font-bold text-lg">
+                      💾
+                    </div>
+                    <h4 className="font-serif font-bold text-lg text-gray-800">Backup Data (JSON)</h4>
+                    <p className="text-xs text-gray-600">
+                      Unduh seluruh file cadangan data foto, anggota, artikel, dan kenangan circle Anda.
+                    </p>
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Unduh Data JSON
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: GUESTBOOK MANAGEMENT */}
+            {publishTab === 'guestbook' && (
+              <div className="space-y-4 animate-fadeIn max-h-80 overflow-y-auto">
+                <h4 className="font-serif font-bold text-lg text-gray-800">Daftar Ucapan Pengunjung ({guestbook.length})</h4>
+                {guestbook.map((g) => (
+                  <div key={g.id} className="p-3 bg-gray-50 rounded-2xl border flex justify-between items-start text-xs">
+                    <div>
+                      <span className="font-bold text-gray-800">{g.emoji || '💖'} {g.name}</span>
+                      <span className="text-[10px] text-gray-400 ml-2">({g.date})</span>
+                      <p className="text-gray-600 mt-1 italic">"{g.message}"</p>
+                    </div>
+                    <button
+                      onClick={() => deleteItem('guestbook', g.id)}
+                      className="text-red-500 hover:underline text-[11px]"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Footer Modal */}
+            <div className="pt-4 border-t flex justify-end">
+              <button
+                onClick={() => setShowPublishModal(false)}
+                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs"
+              >
+                Tutup Window
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ... existing code modals and footer ... */}
+
+    </div>
+  );
+}
