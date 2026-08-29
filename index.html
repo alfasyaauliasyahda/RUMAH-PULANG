@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, Calendar, MapPin, Sparkles, Camera, BookOpen, Mail, Music, 
   Trophy, CheckSquare, Plus, Edit2, Trash2, X, Lock, Unlock, Image as ImageIcon, 
@@ -15,7 +15,6 @@ import {
   getFirestore, collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp 
 } from 'firebase/firestore';
 
-// Initialize Firebase safely (Supports Platform Injected Config, Global Window Config, or Local Fallback)
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try { return JSON.parse(__firebase_config); } catch (e) { console.error("Firebase config parse error", e); }
@@ -23,11 +22,11 @@ const getFirebaseConfig = () => {
   if (typeof window !== 'undefined' && window.FIREBASE_CONFIG) {
     try { return typeof window.FIREBASE_CONFIG === 'string' ? JSON.parse(window.FIREBASE_CONFIG) : window.FIREBASE_CONFIG; } catch (e) { console.error("Window Firebase config error", e); }
   }
-  return {};
+  return null;
 };
 
 const firebaseConfig = getFirebaseConfig();
-const app = firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null;
+const app = (firebaseConfig && firebaseConfig.apiKey) ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 const appId = (typeof __app_id !== 'undefined' && __app_id) 
@@ -60,7 +59,7 @@ const DEFAULT_STORIES = [
 
 const DEFAULT_MEMORIES = [
   { id: '1', title: 'Movie Night & Warm Pizza', category: 'Hangouts', date: '20 Mei 2024', location: 'Rumah Fasya', uploader: 'Alrisa', photo: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=800', caption: 'Movie night yang berujung cerita panjang sampai subuh.' },
-  { id: '2', title: 'Sunset Hunting di Bukit', category: 'Trips', date: '12 Juli 2024', location: 'Bandung Barat', uploader: 'Tera', photo: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&q=80&w=800', caption: 'Mengejar matahari terbenam walau macet parah.' },
+  { id: '2', title: 'Sunset Hunting di Bukit', category: 'Trips', date: '12 Juli 2024', location: 'Bandung Barat', uploader: 'Fasya', photo: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&q=80&w=800', caption: 'Mengejar matahari terbenam walau macet parah.' },
   { id: '3', title: 'Kejut Ultah Khansa', category: 'Birthdays', date: '03 Jan 2025', location: 'Cafe Resto', uploader: 'Amalia', photo: 'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?auto=format&fit=crop&q=80&w=800', caption: 'Lilin sempat mati 3 kali gara-gara angin kencang!' },
   { id: '4', title: 'Kulineran Malam Seblak Pedas', category: 'Food Dates', date: '15 Feb 2025', location: 'Dipatiukur', uploader: 'Fasya', photo: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=800', caption: 'Siapa yang minta level 5 tapi kepedasan sendiri?' }
 ];
@@ -80,12 +79,12 @@ const DEFAULT_JOURNALS = [
 ];
 
 const DEFAULT_LETTERS = [
-  { id: '1', sender: 'Tera', recipient: 'Fasya', category: 'Open when you miss us', content: 'Hey Fasya! Kalau kamu lagi ngerasa sendiri atau capek sama rutinitas, inget ya kalau kami selalu ada satu telfon jauhnya. Jangan dipendem sendiri!', date: '01 Feb 2025' },
+  { id: '1', sender: 'Fasya', recipient: 'Alrisa', category: 'Open when you miss us', content: 'Hey Alrisa! Kalau kamu lagi ngerasa sendiri atau capek sama rutinitas, inget ya kalau kami selalu ada satu telfon jauhnya. Jangan dipendem sendiri!', date: '01 Feb 2025' },
   { id: '2', sender: 'Anonim', recipient: 'Semua Circle', category: 'Open on your birthday', content: 'Makasih udah jadi tempat aman buat saling cerita tanpa takut di-judge. Love you all so much!', date: '14 Feb 2025' }
 ];
 
 const DEFAULT_WALL_OF_CHAOS = [
-  { id: '1', title: 'Alasan Telat Paling Absurd', author: 'Tera', quote: '“Gue udah di jalan (padahal baru bangun dan masih pakai selimut)”', photo: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=600', tag: 'Inside Joke' },
+  { id: '1', title: 'Alasan Telat Paling Absurd', author: 'Fasya', quote: '“Gue udah di jalan (padahal baru bangun dan masih pakai selimut)”', photo: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&q=80&w=600', tag: 'Inside Joke' },
   { id: '2', title: 'Ayam Geprek Level 100', author: 'Khansa', quote: '“Siapa bilang ini pedas? *mata berkaca-kaca*”', photo: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&q=80&w=600', tag: 'Fail Moment' }
 ];
 
@@ -126,17 +125,13 @@ export default function App() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
 
-  // Publishing & Share States
-  const [isPublicView, setIsPublicView] = useState(false); // Mode Tamu (Read-Only Preview)
+  // Mode Tamu (Read-Only Preview)
+  const [isPublicView, setIsPublicView] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
-  const [publishTab, setPublishTab] = useState('link'); // 'link' | 'settings' | 'export' | 'guestbook'
+  const [publishTab, setPublishTab] = useState('link');
   const [copySuccess, setCopySuccess] = useState(false);
-  const [guestbook, setGuestbook] = useState(DEFAULT_GUESTBOOK);
-  const [newGuestMessage, setNewGuestMessage] = useState('');
-  const [newGuestName, setNewGuestName] = useState('');
-  const [newGuestEmoji, setNewGuestEmoji] = useState('💖');
 
-  // Firestore collections states
+  // States untuk data lokal / synced
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [members, setMembers] = useState(DEFAULT_MEMBERS);
   const [stories, setStories] = useState(DEFAULT_STORIES);
@@ -151,22 +146,28 @@ export default function App() {
   const [vault, setVault] = useState(DEFAULT_VAULT);
   const [bucketList, setBucketList] = useState(DEFAULT_BUCKET_LIST);
   const [dreamBoard, setDreamBoard] = useState(DEFAULT_DREAM_BOARD);
+  const [guestbook, setGuestbook] = useState(DEFAULT_GUESTBOOK);
 
-  // Status indicator
-  const [syncStatus, setSyncStatus] = useState('Synced');
+  // Guestbook Form
+  const [newGuestName, setNewGuestName] = useState('');
+  const [newGuestMessage, setNewGuestMessage] = useState('');
+  const [newGuestEmoji, setNewGuestEmoji] = useState('💖');
 
-  // Generic Edit/Add Modal State
+  // Status sinkronisasi
+  const [syncStatus, setSyncStatus] = useState('Siap');
+
+  // Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
+  const [formData, setFormData] = useState({});
 
-  // Envelope Modal State
+  // Letter envelope
   const [activeLetter, setActiveLetter] = useState(null);
   const [isLetterOpen, setIsLetterOpen] = useState(false);
 
-  // Firebase Auth setup
   useEffect(() => {
     if (!auth) {
-      setSyncStatus('Offline Mode (In-Memory)');
+      setSyncStatus('Mode Offline / Lintas Perangkat');
       return;
     }
     const initAuth = async () => {
@@ -185,21 +186,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync collections with Firestore
   useEffect(() => {
     if (!db || !user) return;
 
     const getColRef = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
 
-    // Sync settings
     const unsubSettings = onSnapshot(getColRef('settings'), (snap) => {
-      if (!snap.empty) {
-        setSettings(snap.docs[0].data());
-      }
+      if (!snap.empty) setSettings(snap.docs[0].data());
     }, (err) => console.log("Settings error:", err));
 
-    // Helper for simple array collections
-    const syncCollection = (colName, setState, defaultData) => {
+    const syncCollection = (colName, setState) => {
       return onSnapshot(getColRef(colName), (snap) => {
         if (!snap.empty) {
           const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -210,26 +206,25 @@ export default function App() {
 
     const unsubs = [
       unsubSettings,
-      syncCollection('members', setMembers, DEFAULT_MEMBERS),
-      syncCollection('stories', setStories, DEFAULT_STORIES),
-      syncCollection('memories', setMemories, DEFAULT_MEMORIES),
-      syncCollection('activities', setActivities, DEFAULT_ACTIVITIES),
-      syncCollection('places', setPlaces, DEFAULT_PLACES),
-      syncCollection('journals', setJournals, DEFAULT_JOURNALS),
-      syncCollection('letters', setLetters, DEFAULT_LETTERS),
-      syncCollection('wall_of_chaos', setWallOfChaos, DEFAULT_WALL_OF_CHAOS),
-      syncCollection('soundtrack', setSoundtrack, DEFAULT_SOUNDTRACK),
-      syncCollection('awards', setAwards, DEFAULT_AWARDS),
-      syncCollection('vault', setVault, DEFAULT_VAULT),
-      syncCollection('bucket_list', setBucketList, DEFAULT_BUCKET_LIST),
-      syncCollection('dream_board', setDreamBoard, DEFAULT_DREAM_BOARD),
-      syncCollection('guestbook', setGuestbook, DEFAULT_GUESTBOOK)
+      syncCollection('members', setMembers),
+      syncCollection('stories', setStories),
+      syncCollection('memories', setMemories),
+      syncCollection('activities', setActivities),
+      syncCollection('places', setPlaces),
+      syncCollection('journals', setJournals),
+      syncCollection('letters', setLetters),
+      syncCollection('wall_of_chaos', setWallOfChaos),
+      syncCollection('soundtrack', setSoundtrack),
+      syncCollection('awards', setAwards),
+      syncCollection('vault', setVault),
+      syncCollection('bucket_list', setBucketList),
+      syncCollection('dream_board', setDreamBoard),
+      syncCollection('guestbook', setGuestbook)
     ];
 
     return () => unsubs.forEach(unsub => unsub && unsub());
   }, [user]);
 
-  // Helper to copy live link
   const handleCopyLink = () => {
     const url = window.location.href;
     const dummy = document.createElement('input');
@@ -242,24 +237,11 @@ export default function App() {
     setTimeout(() => setCopySuccess(false), 2500);
   };
 
-  // Export full JSON backup
   const handleExportJSON = () => {
     const exportData = {
-      appId,
-      settings,
-      members,
-      stories,
-      memories,
-      activities,
-      places,
-      journals,
-      letters,
-      wallOfChaos,
-      soundtrack,
-      awards,
-      vault,
-      bucketList,
-      dreamBoard,
+      appId, settings, members, stories, memories, activities, 
+      places, journals, letters, wallOfChaos, soundtrack, awards, 
+      vault, bucketList, dreamBoard, guestbook,
       exportedAt: new Date().toISOString()
     };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
@@ -271,12 +253,8 @@ export default function App() {
     downloadAnchor.remove();
   };
 
-  // Trigger Print / PDF View
-  const handlePrintBook = () => {
-    window.print();
-  };
+  const handlePrintBook = () => { window.print(); };
 
-  // Post guestbook message
   const handleAddGuestbookMessage = (e) => {
     e.preventDefault();
     if (!newGuestName.trim() || !newGuestMessage.trim()) return;
@@ -293,7 +271,6 @@ export default function App() {
     setNewGuestMessage('');
   };
 
-  // Request user name before action if not set
   const executeWithIdentity = (actionFn) => {
     if (!userName.trim()) {
       setPendingAction(() => actionFn);
@@ -314,9 +291,8 @@ export default function App() {
     }
   };
 
-  // Database Save Helper
   const saveToCloud = async (collectionName, data, id = null) => {
-    setSyncStatus('Saving...');
+    setSyncStatus('Menyimpan...');
     try {
       if (db && user) {
         const colRef = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
@@ -330,24 +306,15 @@ export default function App() {
           await addDoc(colRef, { ...data, createdAt: serverTimestamp() });
         }
       } else {
-        // Fallback local state update
         if (collectionName === 'settings') {
           setSettings(data);
         } else {
           const stateSetterMap = {
-            members: setMembers,
-            stories: setStories,
-            memories: setMemories,
-            activities: setActivities,
-            places: setPlaces,
-            journals: setJournals,
-            letters: setLetters,
-            wall_of_chaos: setWallOfChaos,
-            soundtrack: setSoundtrack,
-            awards: setAwards,
-            vault: setVault,
-            bucket_list: setBucketList,
-            dream_board: setDreamBoard
+            members: setMembers, stories: setStories, memories: setMemories,
+            activities: setActivities, places: setPlaces, journals: setJournals,
+            letters: setLetters, wall_of_chaos: setWallOfChaos, soundtrack: setSoundtrack,
+            awards: setAwards, vault: setVault, bucket_list: setBucketList,
+            dream_board: setDreamBoard, guestbook: setGuestbook
           };
           const setState = stateSetterMap[collectionName];
           if (setState) {
@@ -358,50 +325,40 @@ export default function App() {
           }
         }
       }
-      setSyncStatus('Saved ✓');
-      setTimeout(() => setSyncStatus('Synced'), 2000);
+      setSyncStatus('Tersimpan ✓');
+      setTimeout(() => setSyncStatus('Siap'), 2000);
     } catch (err) {
       console.error("Save error:", err);
-      setSyncStatus('Offline (Saved locally)');
+      setSyncStatus('Simpan Lokal');
     }
   };
 
-  // Delete Item Helper
   const deleteItem = (collectionName, id) => {
     executeWithIdentity(async () => {
-      setSyncStatus('Saving...');
+      setSyncStatus('Menghapus...');
       try {
         if (db && user) {
           const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
           await deleteDoc(docRef);
         } else {
           const stateSetterMap = {
-            members: setMembers,
-            stories: setStories,
-            memories: setMemories,
-            activities: setActivities,
-            places: setPlaces,
-            journals: setJournals,
-            letters: setLetters,
-            wall_of_chaos: setWallOfChaos,
-            soundtrack: setSoundtrack,
-            awards: setAwards,
-            vault: setVault,
-            bucket_list: setBucketList,
-            dream_board: setDreamBoard
+            members: setMembers, stories: setStories, memories: setMemories,
+            activities: setActivities, places: setPlaces, journals: setJournals,
+            letters: setLetters, wall_of_chaos: setWallOfChaos, soundtrack: setSoundtrack,
+            awards: setAwards, vault: setVault, bucket_list: setBucketList,
+            dream_board: setDreamBoard, guestbook: setGuestbook
           };
           const setState = stateSetterMap[collectionName];
           if (setState) setState(prev => prev.filter(item => item.id !== id));
         }
-        setSyncStatus('Saved ✓');
-        setTimeout(() => setSyncStatus('Synced'), 2000);
+        setSyncStatus('Tersimpan ✓');
+        setTimeout(() => setSyncStatus('Siap'), 2000);
       } catch (err) {
         console.error("Delete error:", err);
       }
     });
   };
 
-  // Toggle Bucket list item
   const toggleBucketList = (item) => {
     executeWithIdentity(async (authorName) => {
       const updated = {
@@ -416,10 +373,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#FFF9F2] text-[#26354A] font-sans selection:bg-[#F9DDE8]">
       
-      {/* Public View Mode Banner Indicator */}
+      {/* Banner Mode Tamu */}
       {isPublicView && (
         <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white text-xs font-semibold py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-sm">
-          <span>👁️ Anda sedang melihat dalam **Mode Tamu (Public View)**. Pengeditan disembunyikan.</span>
+          <span>👁️ Anda melihat dalam **Mode Tamu (Public View)**. Tombol edit disembunyikan.</span>
           <button
             onClick={() => setIsPublicView(false)}
             className="underline bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-[11px] font-bold transition"
@@ -429,10 +386,9 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Sticky Bar */}
+      {/* Sticky Top Header Navigation */}
       <header className="sticky top-0 z-40 bg-[#FFF9F2]/90 backdrop-blur-md border-b border-[#E8E0F5] px-4 py-3 shadow-sm print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Logo / Circle Title */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('beranda')}>
             <div className="w-10 h-10 rounded-2xl bg-[#F9DDE8] flex items-center justify-center text-[#26354A] shadow-inner font-bold text-xl">
               🏠
@@ -450,7 +406,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1 overflow-x-auto py-1 text-sm font-medium">
             {[
               { id: 'beranda', label: 'Beranda' },
@@ -461,7 +416,7 @@ export default function App() {
               { id: 'surat', label: 'Surat' },
               { id: 'wall-of-chaos', label: 'Wall of Chaos' },
               { id: 'soundtrack', label: 'Soundtrack' },
-              { id: 'more', label: 'Lainnya ▾' },
+              { id: 'bucket-list', label: 'Wishlist' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -477,9 +432,7 @@ export default function App() {
             ))}
           </nav>
 
-          {/* Header Action Buttons including Publish */}
           <div className="flex items-center space-x-2">
-            {/* Publish & Share Button */}
             <button
               onClick={() => setShowPublishModal(true)}
               className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-full text-xs font-bold shadow-md flex items-center space-x-1.5 transition-all transform hover:scale-105"
@@ -487,34 +440,6 @@ export default function App() {
               <Globe className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '8s' }} />
               <span>🚀 Bagikan & Publish</span>
             </button>
-
-            {!isPublicView && (
-              <button
-                onClick={() => {
-                  executeWithIdentity(() => {
-                    setModalConfig({
-                      type: 'memories',
-                      mode: 'add',
-                      title: 'Tambah Kenangan Baru',
-                      collectionName: 'memories',
-                      fields: [
-                        { name: 'title', label: 'Judul Momen', type: 'text', placeholder: 'cth: Camp di Ranca Upas' },
-                        { name: 'category', label: 'Kategori', type: 'select', options: ['Hangouts', 'Trips', 'Food Dates', 'Birthdays', 'Random Days', 'Celebrations'] },
-                        { name: 'date', label: 'Tanggal', type: 'text', placeholder: 'cth: 12 Mei 2025' },
-                        { name: 'location', label: 'Lokasi', type: 'text', placeholder: 'cth: Bandung' },
-                        { name: 'photo', label: 'Foto / Gambar', type: 'image' },
-                        { name: 'caption', label: 'Cerita Singkat', type: 'textarea' },
-                      ]
-                    });
-                    setModalOpen(true);
-                  });
-                }}
-                className="hidden sm:flex px-3.5 py-2 bg-[#F9DDE8] hover:bg-[#f3c8da] border border-[#f0b9d1] rounded-full text-xs font-semibold shadow-sm items-center space-x-1.5 transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-pink-600" />
-                <span>+ Kenangan</span>
-              </button>
-            )}
 
             {!isPublicView && (
               <button
@@ -529,27 +454,59 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Navigation Submenu for "Lainnya" if active */}
-      {/* ... existing code ... */}
-
-      {/* MAIN CONTENT AREA */}
+      {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 py-6 md:py-10">
         
-        {/* ==================== 1. HOMEPAGE / BERANDA ==================== */}
         {activeTab === 'beranda' && (
           <div className="space-y-12 animate-fadeIn">
-            
-            {/* HERO SECTION MATCHING REFERENCE DESIGN */}
-            {/* ... existing code ... */}
+            {/* Hero Section */}
+            <div className="relative rounded-3xl overflow-hidden bg-white border border-pink-100 shadow-sm p-6 md:p-12 flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1 space-y-4 text-center md:text-left z-10">
+                <span className="inline-block px-3.5 py-1 rounded-full bg-[#F9DDE8] text-pink-900 text-xs font-bold uppercase tracking-wider">
+                  ✨ Est. {settings.foundedYear}
+                </span>
+                <h2 className="font-serif text-3xl md:text-5xl font-bold text-[#26354A] leading-tight">
+                  {settings.tagline}
+                </h2>
+                <p className="text-gray-600 text-sm md:text-base leading-relaxed">
+                  {settings.subtitle}
+                </p>
+                <div className="p-4 rounded-2xl bg-[#FFF9F2] border border-amber-100 italic text-xs md:text-sm text-gray-700 font-serif">
+                  "{settings.customQuote}"
+                </div>
+              </div>
+              <div className="w-full md:w-1/2 relative">
+                <img 
+                  src={settings.heroImage} 
+                  alt="Ruang Pulang Hero" 
+                  className="w-full h-64 md:h-80 object-cover rounded-2xl shadow-md border-4 border-white transform rotate-1 hover:rotate-0 transition duration-300"
+                />
+              </div>
+            </div>
 
-            {/* ROOM DOORS GRID ("PILIH KAMARMU") */}
-            {/* ... existing code ... */}
+            {/* Quick Navigation Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[
+                { tab: 'our-story', title: 'Perjalanan', icon: '📖', count: `${stories.length} Kisah` },
+                { tab: 'the-people', title: 'Anggota', icon: '👥', count: `${members.length} Orang` },
+                { tab: 'memories', title: 'Galeri Foto', icon: '🖼️', count: `${memories.length} Foto` },
+                { tab: 'kegiatan', title: 'Kegiatan', icon: '🗓️', count: `${activities.length} Agenda` },
+                { tab: 'surat', title: 'Kotak Surat', icon: '✉️', count: `${letters.length} Pesan` },
+                { tab: 'wall-of-chaos', title: 'Chaos Wall', icon: '🤪', count: `${wallOfChaos.length} Momen` },
+              ].map((item) => (
+                <div
+                  key={item.tab}
+                  onClick={() => setActiveTab(item.tab)}
+                  className="bg-white p-4 rounded-2xl border border-pink-100 shadow-2xs hover:shadow-md cursor-pointer transition transform hover:-translate-y-1 text-center space-y-1"
+                >
+                  <div className="text-3xl mb-1">{item.icon}</div>
+                  <h4 className="font-serif font-bold text-sm text-gray-800">{item.title}</h4>
+                  <p className="text-[11px] text-gray-400">{item.count}</p>
+                </div>
+              ))}
+            </div>
 
-            {/* QUICK PREVIEWS GRID */}
-            {/* ... existing code ... */}
-
-            {}
-            {/* PUBLIC GUESTBOOK / UCAPAN PENGUNJUNG SECTION */}
+            {/* Guestbook Section */}
             <div className="bg-white rounded-3xl border-2 border-pink-100 p-6 md:p-8 shadow-sm space-y-6">
               <div className="flex justify-between items-center flex-wrap gap-4 border-b border-pink-50 pb-4">
                 <div>
@@ -571,11 +528,10 @@ export default function App() {
                   }}
                   className="text-xs text-pink-600 font-semibold hover:underline flex items-center gap-1"
                 >
-                  Lihat Semua Pesan ({guestbook.length}) →
+                  Kelola Ucapan ({guestbook.length}) →
                 </button>
               </div>
 
-              {/* Form Tambah Pesan Tamu */}
               <form onSubmit={handleAddGuestbookMessage} className="bg-[#FFF9F2] p-4 rounded-2xl border border-amber-100 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                   <input
@@ -616,9 +572,8 @@ export default function App() {
                 </div>
               </form>
 
-              {/* List Buku Tamu */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {guestbook.slice(0, 6).map((g) => (
+                {guestbook.map((g) => (
                   <div key={g.id} className="bg-[#FFF9F2]/60 p-4 rounded-2xl border border-pink-100 shadow-2xs space-y-2 relative">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-bold text-gray-800 flex items-center gap-1">
@@ -631,37 +586,198 @@ export default function App() {
                 ))}
               </div>
             </div>
-
           </div>
         )}
 
-        {/* ... existing code tabs ... */}
+        {activeTab === 'our-story' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className="flex justify-between items-center border-b pb-4">
+              <div>
+                <h2 className="font-serif text-3xl font-bold text-[#26354A]">Kisah & Jejak Langkah</h2>
+                <p className="text-xs text-gray-500">Perjalanan bagaimana circle ini terbentuk dari waktu ke waktu.</p>
+              </div>
+            </div>
+
+            <div className="relative border-l-2 border-pink-200 ml-4 md:ml-8 space-y-8 py-2">
+              {stories.map((story) => (
+                <div key={story.id} className="relative pl-6 md:pl-8 group">
+                  <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-pink-400 border-4 border-white shadow-xs"></div>
+                  <div className="bg-white p-6 rounded-2xl border border-pink-100 shadow-2xs space-y-3">
+                    <div className="flex justify-between items-start">
+                      <span className="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-xs font-bold">
+                        {story.year}
+                      </span>
+                      {!isPublicView && (
+                        <button onClick={() => deleteItem('stories', story.id)} className="text-red-400 hover:text-red-600 text-xs">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    <h3 className="font-serif font-bold text-xl text-gray-800">{story.title}</h3>
+                    <p className="text-xs text-gray-600 leading-relaxed">{story.description}</p>
+                    {story.photo && (
+                      <img src={story.photo} alt={story.title} className="w-full h-48 md:h-64 object-cover rounded-xl shadow-xs" />
+                    )}
+                    <span className="block text-[11px] text-gray-400 italic">Ditulis oleh: {story.author}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'the-people' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div>
+              <h2 className="font-serif text-3xl font-bold text-[#26354A]">Anggota Circle</h2>
+              <p className="text-xs text-gray-500">Orang-orang spesial yang melengkapi warna di rumah ini.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {members.map((m) => (
+                <div key={m.id} className="bg-white rounded-3xl p-5 border border-pink-100 shadow-2xs space-y-4 hover:shadow-md transition">
+                  <img src={m.photo} alt={m.name} className="w-full h-48 object-cover rounded-2xl shadow-xs" />
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full">{m.role}</span>
+                    <h3 className="font-serif font-bold text-lg text-gray-800">{m.name} ({m.nickname})</h3>
+                    <p className="text-xs text-pink-600 font-medium">🎂 Ultah: {m.birthday} • {m.personality}</p>
+                  </div>
+                  <div className="text-xs space-y-1 bg-[#FFF9F2] p-3 rounded-xl border border-amber-100">
+                    <p><b>Makanan Fav:</b> {m.favoriteFood}</p>
+                    <p><b>Lagu Fav:</b> {m.favoriteSong}</p>
+                    <p className="italic text-gray-500">"{m.quote}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'memories' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div>
+              <h2 className="font-serif text-3xl font-bold text-[#26354A]">Galeri Kenangan</h2>
+              <p className="text-xs text-gray-500">Kumpulan momen foto manis, konyol, dan tak terlupakan.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {memories.map((mem) => (
+                <div key={mem.id} className="bg-white p-3 rounded-2xl border border-pink-100 shadow-2xs space-y-3">
+                  <img src={mem.photo} alt={mem.title} className="w-full h-48 object-cover rounded-xl" />
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] text-gray-400">
+                      <span>📍 {mem.location}</span>
+                      <span>📅 {mem.date}</span>
+                    </div>
+                    <h4 className="font-serif font-bold text-base text-gray-800">{mem.title}</h4>
+                    <p className="text-xs text-gray-600">{mem.caption}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'kegiatan' && (
+          <div className="space-y-6 animate-fadeIn">
+            <h2 className="font-serif text-3xl font-bold text-[#26354A]">Agenda & Plans</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activities.map((act) => (
+                <div key={act.id} className="bg-white p-5 rounded-2xl border border-pink-100 space-y-2">
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${act.status === 'Upcoming' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                    {act.status}
+                  </span>
+                  <h3 className="font-serif font-bold text-xl text-gray-800">{act.title}</h3>
+                  <p className="text-xs text-gray-500">📅 {act.date} • 📍 {act.location}</p>
+                  <p className="text-xs text-gray-600 bg-gray-50 p-3 rounded-xl">{act.note}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'surat' && (
+          <div className="space-y-6 animate-fadeIn">
+            <h2 className="font-serif text-3xl font-bold text-[#26354A]">Kotak Surat Rahasia</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {letters.map((lettr) => (
+                <div key={lettr.id} className="bg-[#FFF9F2] p-6 rounded-3xl border border-amber-200 shadow-sm space-y-3 relative">
+                  <span className="text-xs bg-pink-100 text-pink-800 px-3 py-1 rounded-full font-bold">{lettr.category}</span>
+                  <h4 className="font-serif font-bold text-base text-gray-800">Dari: {lettr.sender} ➔ Untuk: {lettr.recipient}</h4>
+                  <p className="text-xs text-gray-600 italic">"{lettr.content}"</p>
+                  <span className="text-[10px] text-gray-400 block text-right">{lettr.date}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'wall-of-chaos' && (
+          <div className="space-y-6 animate-fadeIn">
+            <h2 className="font-serif text-3xl font-bold text-[#26354A]">Wall of Chaos 🤪</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {wallOfChaos.map((item) => (
+                <div key={item.id} className="bg-white p-4 rounded-2xl border border-red-100 shadow-2xs space-y-2">
+                  <img src={item.photo} alt={item.title} className="w-full h-40 object-cover rounded-xl" />
+                  <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">{item.tag}</span>
+                  <h4 className="font-serif font-bold text-base text-gray-800">{item.title}</h4>
+                  <p className="text-xs text-gray-600 italic">{item.quote}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'soundtrack' && (
+          <div className="space-y-6 animate-fadeIn">
+            <h2 className="font-serif text-3xl font-bold text-[#26354A]">Playlist & Soundtrack 🎵</h2>
+            <div className="space-y-3">
+              {soundtrack.map((s) => (
+                <div key={s.id} className="bg-white p-4 rounded-2xl border border-purple-100 flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-base text-gray-800">{s.title} — <span className="text-gray-500 font-normal">{s.artist}</span></h4>
+                    <p className="text-xs text-gray-500">Ditambahkan oleh {s.addedBy}: "{s.story}"</p>
+                  </div>
+                  <a href={s.link} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-xs font-bold">Dengar 🎧</a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'bucket-list' && (
+          <div className="space-y-6 animate-fadeIn">
+            <h2 className="font-serif text-3xl font-bold text-[#26354A]">Wishlist & Bucket List 🎯</h2>
+            <div className="space-y-3">
+              {bucketList.map((item) => (
+                <div key={item.id} className="bg-white p-4 rounded-2xl border border-pink-100 flex justify-between items-center">
+                  <div className="flex items-center space-x-3">
+                    <input type="checkbox" checked={item.completed} onChange={() => toggleBucketList(item)} className="w-5 h-5 accent-pink-500 cursor-pointer" />
+                    <span className={`text-sm ${item.completed ? 'line-through text-gray-400' : 'font-bold text-gray-800'}`}>{item.title}</span>
+                  </div>
+                  <span className="text-xs text-gray-400">Ditambah oleh: {item.addedBy}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
       </main>
 
-      {}
-      {/* ==================== PUBLISH & SHARE MODAL HUB ==================== */}
       {showPublishModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full space-y-6 shadow-2xl border border-purple-100 animate-scaleUp my-8">
-            
-            {/* Header Modal */}
             <div className="flex justify-between items-center border-b pb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-400 to-purple-500 text-white flex items-center justify-center font-bold text-xl shadow">
-                  🚀
-                </div>
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-400 to-purple-500 text-white flex items-center justify-center font-bold text-xl shadow">🚀</div>
                 <div>
                   <h3 className="font-serif font-bold text-2xl text-gray-800">Pusat Publikasi & Bagikan</h3>
                   <p className="text-xs text-gray-500">Publikasikan scrapbook ini agar bisa diakses sahabat & pengunjung!</p>
                 </div>
               </div>
-              <button onClick={() => setShowPublishModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
+              <button onClick={() => setShowPublishModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
             </div>
 
-            {/* Tab Navigation inside Publish Hub */}
             <div className="flex space-x-2 border-b pb-2 overflow-x-auto text-xs font-semibold">
               {[
                 { id: 'link', label: '🔗 Tautan & QR Code' },
@@ -672,24 +788,17 @@ export default function App() {
                 <button
                   key={tab.id}
                   onClick={() => setPublishTab(tab.id)}
-                  className={`px-4 py-2 rounded-xl transition ${
-                    publishTab === tab.id
-                      ? 'bg-[#F9DDE8] text-pink-900 font-bold shadow-xs'
-                      : 'hover:bg-gray-100 text-gray-600'
-                  }`}
+                  className={`px-4 py-2 rounded-xl transition ${publishTab === tab.id ? 'bg-[#F9DDE8] text-pink-900 font-bold shadow-xs' : 'hover:bg-gray-100 text-gray-600'}`}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
 
-            {/* TAB 1: SHARE LINK & QR CODE */}
             {publishTab === 'link' && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-800 font-bold text-base">
-                    ✓
-                  </div>
+                  <div className="w-8 h-8 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-800 font-bold text-base">✓</div>
                   <div>
                     <p className="font-bold text-sm">Status: Scrapbook Ini Aktif & Dipublikasikan 🌐</p>
                     <p className="text-emerald-700">Setiap perubahan data tersimpan otomatis dan bisa dilihat oleh siapa saja yang memiliki link ini.</p>
@@ -699,49 +808,24 @@ export default function App() {
                 <div className="space-y-2">
                   <label className="block text-xs font-bold text-gray-700">Tautan Web Resmi Scrapbook:</label>
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={window.location.href}
-                      className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono text-gray-700 focus:outline-none"
-                    />
-                    <button
-                      onClick={handleCopyLink}
-                      className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition"
-                    >
+                    <input type="text" readOnly value={window.location.href} className="flex-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-mono text-gray-700 focus:outline-none" />
+                    <button onClick={handleCopyLink} className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition">
                       <Copy className="w-3.5 h-3.5" />
                       <span>{copySuccess ? 'Tersalin! ✓' : 'Salin Link'}</span>
                     </button>
                   </div>
                 </div>
 
-                {/* QR CODE GENERATOR */}
                 <div className="bg-[#FFF9F2] p-5 rounded-2xl border border-amber-100 flex flex-col md:flex-row items-center gap-6">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.href)}`}
-                    alt="QR Code Scrapbook"
-                    className="w-36 h-36 border-4 border-white rounded-2xl shadow-md bg-white p-2"
-                  />
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.href)}`} alt="QR Code Scrapbook" className="w-36 h-36 border-4 border-white rounded-2xl shadow-md bg-white p-2" />
                   <div className="space-y-2 text-center md:text-left">
                     <h4 className="font-serif font-bold text-base text-gray-800">Scan QR Code untuk Membuka</h4>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      Pindai QR code ini menggunakan kamera HP untuk langsung membawa sahabat Anda ke dalam halaman *{settings.circleName}*.
-                    </p>
-                    <a
-                      href={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(window.location.href)}`}
-                      target="_blank"
-                      download="qr_scrapbook.png"
-                      rel="noreferrer"
-                      className="inline-block text-xs text-purple-700 font-bold hover:underline pt-1"
-                    >
-                      ⬇ Unduh Gambar QR Code HD
-                    </a>
+                    <p className="text-xs text-gray-600 leading-relaxed">Pindai QR code ini menggunakan kamera HP untuk langsung membawa sahabat Anda ke dalam halaman *{settings.circleName}*.</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 2: PRIVACY & VISITOR PREVIEW */}
             {publishTab === 'settings' && (
               <div className="space-y-5 animate-fadeIn">
                 <div className="p-4 rounded-2xl bg-purple-50 border border-purple-100 space-y-3">
@@ -750,74 +834,34 @@ export default function App() {
                       <h4 className="font-bold text-sm text-gray-800">Preview Mode Tamu (Public View)</h4>
                       <p className="text-xs text-gray-500">Sembunyikan tombol edit/hapus untuk melihat tampilan sebagai pengunjung biasa.</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setIsPublicView(!isPublicView);
-                        setShowPublishModal(false);
-                      }}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                        isPublicView ? 'bg-amber-500 text-white' : 'bg-purple-600 text-white'
-                      }`}
-                    >
+                    <button onClick={() => { setIsPublicView(!isPublicView); setShowPublishModal(false); }} className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${isPublicView ? 'bg-amber-500 text-white' : 'bg-purple-600 text-white'}`}>
                       <Eye className="w-4 h-4" />
                       <span>{isPublicView ? 'Matikan Mode Tamu' : 'Aktifkan Mode Tamu'}</span>
                     </button>
                   </div>
                 </div>
-
-                <div className="space-y-3 text-xs text-gray-600">
-                  <h4 className="font-bold text-gray-800 text-sm">💡 Tips Publikasi Web:</h4>
-                  <ul className="list-disc list-inside space-y-1 bg-gray-50 p-4 rounded-2xl border">
-                    <li>Semua orang yang punya link ini bisa melihat postingan, foto, dan kenangan.</li>
-                    <li>Pastikan tidak mengunggah data sensitif seperti nomor HP, alamat rumah lengkap, atau kata sandi pribadi.</li>
-                    <li>Gunakan fitur "Wall of Chaos" dan "Buku Tamu" untuk saling berinteraksi secara menyenangkan.</li>
-                  </ul>
-                </div>
               </div>
             )}
 
-            {/* TAB 3: EXPORT & PRINT */}
             {publishTab === 'export' && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Print Book Option */}
-                  <div className="bg-[#FFF9F2] p-5 rounded-2xl border border-amber-200 space-y-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-200 flex items-center justify-center text-amber-900 font-bold text-lg">
-                      🖨️
-                    </div>
-                    <h4 className="font-serif font-bold text-lg text-gray-800">Cetak Buku Kenangan (PDF)</h4>
-                    <p className="text-xs text-gray-600">
-                      Cetak langsung atau simpan halaman ini sebagai file PDF fisik untuk kenang-kenangan.
-                    </p>
-                    <button
-                      onClick={handlePrintBook}
-                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> Cetak / Save PDF
-                    </button>
-                  </div>
-
-                  {/* Export JSON Option */}
-                  <div className="bg-[#E8E0F5]/50 p-5 rounded-2xl border border-purple-200 space-y-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-200 flex items-center justify-center text-purple-900 font-bold text-lg">
-                      💾
-                    </div>
-                    <h4 className="font-serif font-bold text-lg text-gray-800">Backup Data (JSON)</h4>
-                    <p className="text-xs text-gray-600">
-                      Unduh seluruh file cadangan data foto, anggota, artikel, dan kenangan circle Anda.
-                    </p>
-                    <button
-                      onClick={handleExportJSON}
-                      className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Unduh Data JSON
-                    </button>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fadeIn">
+                <div className="bg-[#FFF9F2] p-5 rounded-2xl border border-amber-200 space-y-3">
+                  <h4 className="font-serif font-bold text-lg text-gray-800">Cetak Buku Kenangan</h4>
+                  <p className="text-xs text-gray-600">Simpan halaman ini sebagai file PDF fisik.</p>
+                  <button onClick={handlePrintBook} className="w-full py-2 bg-amber-500 text-white font-bold rounded-xl text-xs flex justify-center items-center gap-1">
+                    <Printer className="w-3.5 h-3.5" /> Cetak / Save PDF
+                  </button>
+                </div>
+                <div className="bg-[#E8E0F5]/50 p-5 rounded-2xl border border-purple-200 space-y-3">
+                  <h4 className="font-serif font-bold text-lg text-gray-800">Backup Data (JSON)</h4>
+                  <p className="text-xs text-gray-600">Unduh seluruh file cadangan data circle Anda.</p>
+                  <button onClick={handleExportJSON} className="w-full py-2 bg-purple-600 text-white font-bold rounded-xl text-xs flex justify-center items-center gap-1">
+                    <Download className="w-3.5 h-3.5" /> Unduh Data JSON
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* TAB 4: GUESTBOOK MANAGEMENT */}
             {publishTab === 'guestbook' && (
               <div className="space-y-4 animate-fadeIn max-h-80 overflow-y-auto">
                 <h4 className="font-serif font-bold text-lg text-gray-800">Daftar Ucapan Pengunjung ({guestbook.length})</h4>
@@ -828,32 +872,41 @@ export default function App() {
                       <span className="text-[10px] text-gray-400 ml-2">({g.date})</span>
                       <p className="text-gray-600 mt-1 italic">"{g.message}"</p>
                     </div>
-                    <button
-                      onClick={() => deleteItem('guestbook', g.id)}
-                      className="text-red-500 hover:underline text-[11px]"
-                    >
-                      Hapus
-                    </button>
+                    <button onClick={() => deleteItem('guestbook', g.id)} className="text-red-500 hover:underline text-[11px]">Hapus</button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Footer Modal */}
             <div className="pt-4 border-t flex justify-end">
-              <button
-                onClick={() => setShowPublishModal(false)}
-                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs"
-              >
-                Tutup Window
-              </button>
+              <button onClick={() => setShowPublishModal(false)} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs">Tutup</button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* ... existing code modals and footer ... */}
+      {showNameModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-pink-100">
+            <h3 className="font-serif font-bold text-xl text-gray-800">Siapa Nama Anda? ✍️</h3>
+            <p className="text-xs text-gray-500">Nama Anda akan dicatat sebagai pembuat atau pengedit kenangan di circle ini.</p>
+            <input
+              type="text"
+              placeholder="Contoh: Fasya, Alrisa, Khansa..."
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-pink-300 focus:outline-none"
+              autoFocus
+            />
+            <button
+              onClick={() => handleSaveUserName(userName)}
+              className="w-full py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl text-xs transition shadow-sm"
+            >
+              Simpan Identitas
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
